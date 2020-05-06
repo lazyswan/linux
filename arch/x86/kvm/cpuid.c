@@ -1053,7 +1053,31 @@ bool kvm_cpuid(struct kvm_vcpu *vcpu, u32 *eax, u32 *ebx,
 	return found;
 }
 EXPORT_SYMBOL_GPL(kvm_cpuid);
+/*----------Assignment #2-3-4---------------------------------------
+Author: Swanand
+Bahrath
+SJSUID: 013752752
 
+-------------------------------------------------------------------*/
+atomic_t totalExits; // variable to calculate the total # of Exits
+atomic64_t totalTime; // variable to calculate the total # Time spent in vmx_handle_exit()
+atomic64_t time_per_exit[70]={0}; //Array to keep track of time spend per exit
+atomic_t number_of_exits_occured[70]={0}; //Array to keep track of exits occuring per reason
+
+void custom_exit_and_time_counter(uint8_t exit_reason,uint64_t time){
+	atomic_inc(&totalExits);
+	atomic64_add(time, &totalTime);
+	uint32_t temp_totalExit=(atomic_read(&totalExits));
+	if(exit_reason>-1 && exit_reason<70){
+		atomic64_add(time, &time_per_exit[exit_reason]);	
+		atomic_inc(&(number_of_exits_occured[exit_reason]));
+		
+	}
+	printk("Swanand-->Exit Count %lld \n",temp_totalExit);
+	
+	
+}
+EXPORT_SYMBOL(custom_exit_and_time_counter);
 int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 {
 	u32 eax, ebx, ecx, edx;
@@ -1063,7 +1087,54 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 
 	eax = kvm_rax_read(vcpu);
 	ecx = kvm_rcx_read(vcpu);
-	kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
+	
+	// Report the number of exits :BHARATH
+	if (eax == 0x4fffffff){
+		eax = atomic_read(&totalExits);
+		printk("Swanand:->Total Exits:  %d\n", eax);
+	}
+
+	// Report the Total Time Spend in Exit :BHARATH
+	else if(eax  ==  0x4ffffffe){
+		uint64_t temp_totalTime;
+		uint32_t ecx_temp;
+		temp_totalTime=(atomic64_read(&totalTime));
+		ecx_temp=ecx;
+		ebx =  temp_totalTime >> 32;
+		ecx = (temp_totalTime & 0xffffffff);
+		eax=0;
+		printk("Swanand:->TotalTime: %lld\n", temp_totalTime);
+	}
+
+
+	// Report the number of exits/Reason :SWANAND
+	else if(eax  ==  0x4ffffffd){
+		if(ecx >= 0 && ecx < 70){
+			eax = atomic_read(&number_of_exits_occured[ecx]);
+			printk("Swanand:->Exites/Reason:  %d\n", eax);
+		}	
+	}
+
+	// Report the Time Spend in Exit/Reason: SWANAND
+	else if(eax  ==  0x4ffffffc){
+		if(ecx >= 0 && ecx < 70){
+			uint64_t temp_time;
+			uint32_t ecx_temp;
+			ecx_temp=ecx;		
+			temp_time = atomic64_read(&(time_per_exit[ecx]));
+			ebx = temp_time >> 32;
+			ecx = temp_time & 0xffffffff;
+			eax=0;
+			printk("Swanand:->Time/Exit ecx=%d:  %lld\n", ecx_temp,temp_time);
+		}	
+	}
+	else {
+		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);	
+	}
+	
+	// Changed code to report the number of exits - End
+	
+	//kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);
 	kvm_rax_write(vcpu, eax);
 	kvm_rbx_write(vcpu, ebx);
 	kvm_rcx_write(vcpu, ecx);
@@ -1071,3 +1142,17 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 	return kvm_skip_emulated_instruction(vcpu);
 }
 EXPORT_SYMBOL_GPL(kvm_emulate_cpuid);
+
+
+
+// code to report the number of exits per reason
+
+
+/*void report_exit_reason(u32 exit_reason){
+
+	if(exit_reason >= 0 && exit_reason <=7){
+		total_num_exits++;
+		exits_per_reason[(int)exit_reason]++;
+	}
+}*/
+
