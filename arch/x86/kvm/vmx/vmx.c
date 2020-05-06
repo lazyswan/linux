@@ -30,6 +30,8 @@
 
 #include <asm/apic.h>
 #include <asm/asm.h>
+#include <asm/msr.h>
+#include <asm/atomic.h>
 #include <asm/cpu.h>
 #include <asm/debugreg.h>
 #include <asm/desc.h>
@@ -5837,13 +5839,28 @@ void dump_vmcs(void)
  * The guest has exited.  See if we can fix it or if we need userspace
  * assistance.
  */
+
+
+	
+
+
 static int vmx_handle_exit(struct kvm_vcpu *vcpu,
 	enum exit_fastpath_completion exit_fastpath)
-{
+{	
+
+//Swanand Code Change-----------------------------------------------------
+	extern void custom_exit_and_time_counter (uint8_t,uint64_t);
+	uint64_t start_time, end_time;
+	uint64_t temp_diff;
+	int r_val;
+//Swanand Code Change-----------------------------------------------------
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 exit_reason = vmx->exit_reason;
 	u32 vectoring_info = vmx->idt_vectoring_info;
 
+	
+	
+	start_time = rdtsc();
 	trace_kvm_exit(exit_reason, vcpu, KVM_ISA_VMX);
 
 	/*
@@ -5951,7 +5968,12 @@ static int vmx_handle_exit(struct kvm_vcpu *vcpu,
 	if (!kvm_vmx_exit_handlers[exit_reason])
 		goto unexpected_vmexit;
 
-	return kvm_vmx_exit_handlers[exit_reason](vcpu);
+//Swanand Code Change-----------------------------
+	r_val = kvm_vmx_exit_handlers[exit_reason](vcpu);
+	end_time = rdtsc();
+	temp_diff = (end_time - start_time);
+	custom_exit_and_time_counter(exit_reason,temp_diff);
+	return r_val;
 
 unexpected_vmexit:
 	vcpu_unimpl(vcpu, "vmx: unexpected exit reason 0x%x\n", exit_reason);
@@ -5961,6 +5983,7 @@ unexpected_vmexit:
 			KVM_INTERNAL_ERROR_UNEXPECTED_EXIT_REASON;
 	vcpu->run->internal.ndata = 1;
 	vcpu->run->internal.data[0] = exit_reason;
+
 	return 0;
 }
 
@@ -8084,4 +8107,4 @@ static int __init vmx_init(void)
 
 	return 0;
 }
-module_init(vmx_init);
+module_init(vmx_init); 

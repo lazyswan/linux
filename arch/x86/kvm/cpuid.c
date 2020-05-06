@@ -1067,13 +1067,13 @@ atomic_t number_of_exits_occured[70]={0}; //Array to keep track of exits occurin
 void custom_exit_and_time_counter(uint8_t exit_reason,uint64_t time){
 	atomic_inc(&totalExits);
 	atomic64_add(time, &totalTime);
-	uint32_t temp_totalExit=(atomic_read(&totalExits));
+	//uint32_t temp_totalExit=(atomic_read(&totalExits));
 	if(exit_reason>-1 && exit_reason<70){
 		atomic64_add(time, &time_per_exit[exit_reason]);	
 		atomic_inc(&(number_of_exits_occured[exit_reason]));
 		
 	}
-	printk("Swanand-->Exit Count %lld \n",temp_totalExit);
+	//printk("Swanand-->Exit Count %lld \n",temp_totalExit);
 	
 	
 }
@@ -1126,8 +1126,20 @@ int kvm_emulate_cpuid(struct kvm_vcpu *vcpu)
 			ecx = temp_time & 0xffffffff;
 			eax=0;
 			printk("Swanand:->Time/Exit ecx=%d:  %lld\n", ecx_temp,temp_time);
-		}	
+		}
+
+		
 	}
+	else if(eax  ==  0x4ffffffa){
+		int i=0;
+		uint32_t temp_time;
+		for(i=0;i<70;i++){
+		temp_time=atomic_read(&number_of_exits_occured[i]);
+		printk("Swanand:->Time/Exit for Exit#=%d:  %d\n", i,temp_time);
+		}
+
+	}
+		
 	else {
 		kvm_cpuid(vcpu, &eax, &ebx, &ecx, &edx, true);	
 	}
